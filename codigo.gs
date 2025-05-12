@@ -4,7 +4,7 @@
  * Data da última atualização: 12/05/2025
  * 
  * Changelog:
- * 1.5.0 - Adição de campo Motivo na seção Devolução, reorganização em duas etapas
+ * 1.5.0 - Adição de campo Motivo na seção Devolução de Pedidos
  * 1.4.0 - Adição de campo Telefone nas seções Reembolso e Devolução, reorganização da data e dias de atraso
  * 1.3.0 - Adição dos campos Telefone e Transportadora na seção Pedidos em Atraso
  * 1.2.4 - Correção da função getDevolucoes() e carregarDevolucoes()
@@ -599,7 +599,7 @@ function desarquivarReembolso(id) {
   }
 }
 
-// DEVOLUÇÃO DE PEDIDOS: FUNÇÕES BÁSICAS - ATUALIZADAS PARA A VERSÃO 1.5.0
+// DEVOLUÇÃO DE PEDIDOS: FUNÇÕES BÁSICAS - CORRIGIDAS
 function getDevolucoes() {
   try {
     Logger.log("Iniciando getDevolucoes()");
@@ -653,7 +653,7 @@ function getDevolucoes() {
           row[8] = day + '/' + month + '/' + year;
         }
         
-        // Adiciona as colunas relevantes incluindo o novo campo Motivo
+        // Adiciona todas as colunas relevantes (incluindo Motivo)
         filteredData.push([
           row[0],  // ID
           row[1],  // Pedido
@@ -728,7 +728,7 @@ function getDevolucoesArquivadas() {
           dataArquivamento = day + '/' + month + '/' + year;
         }
         
-        // Retorna apenas as colunas necessárias para devoluções arquivadas
+        // Retorna as colunas necessárias para devoluções arquivadas (incluindo Motivo)
         filteredData.push([
           row[0],            // ID
           row[1],            // Pedido
@@ -800,8 +800,8 @@ function addDevolucao(pedido, cliente, telefone, produtos, dataDevolucao, quemPa
       telefone, // Telefone
       produtos, 
       dataDevObj, 
-      quemPaga,
-      motivo,   // Novo campo Motivo
+      quemPaga, 
+      motivo,   // Motivo
       dataRecObj, 
       parecer, 
       devolvidoEstoque, 
@@ -864,12 +864,12 @@ function updateDevolucao(id, pedido, cliente, telefone, produtos, dataDevolucao,
         
         // Atualiza os valores
         sheet.getRange(i, 2).setValue(pedido);
-        sheet.getRange(i, 3).setValue(cliente);
-        sheet.getRange(i, 4).setValue(telefone);
+        sheet.getRange(i, 3).setValue(cliente);  // Cliente
+        sheet.getRange(i, 4).setValue(telefone); // Telefone
         sheet.getRange(i, 5).setValue(produtos);
         sheet.getRange(i, 6).setValue(dataDevObj);
         sheet.getRange(i, 7).setValue(quemPaga);
-        sheet.getRange(i, 8).setValue(motivo);
+        sheet.getRange(i, 8).setValue(motivo);   // Motivo
         sheet.getRange(i, 9).setValue(dataRecObj);
         sheet.getRange(i, 10).setValue(parecer);
         sheet.getRange(i, 11).setValue(devolvidoEstoque);
@@ -1040,6 +1040,73 @@ function migrarDados() {
   return "Migração de dados concluída!";
 }
 
+// Função para migrar a estrutura das planilhas para a versão 1.4.0
+function migrarParaV1_4_0() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 1. Migrar ReembolsoFinanceiro - Adicionar campo Telefone
+    var reembolsoSheet = ss.getSheetByName('ReembolsoFinanceiro');
+    if (reembolsoSheet) {
+      // Verificar se já tem a estrutura da v1.4.0
+      var headers = reembolsoSheet.getRange(1, 1, 1, reembolsoSheet.getLastColumn()).getValues()[0];
+      
+      // Se não tiver o campo Telefone, adicionar
+      if (headers[3] !== 'Telefone') {
+        // Criar backup
+        var backupSheet = ss.insertSheet('ReembolsoFinanceiro_Backup_v1_3_0');
+        reembolsoSheet.getDataRange().copyTo(backupSheet.getRange(1, 1));
+        
+        // Inserir a nova coluna (Telefone) após a coluna Cliente
+        reembolsoSheet.insertColumnAfter(3);
+        reembolsoSheet.getRange(1, 4).setValue('Telefone');
+        
+        // Migrar dados existentes
+        if (reembolsoSheet.getLastRow() > 1) {
+          for (var i = 2; i <= reembolsoSheet.getLastRow(); i++) {
+            reembolsoSheet.getRange(i, 4).setValue(''); // Telefone vazio para registros existentes
+          }
+        }
+        
+        Logger.log("Reembolso Financeiro atualizado para v1.4.0");
+      }
+    }
+    
+    // 2. Migrar DevolucaoPedidos - Adicionar campo Telefone
+    var devolucaoSheet = ss.getSheetByName('DevolucaoPedidos');
+    if (devolucaoSheet) {
+      // Verificar se já tem a estrutura da v1.4.0
+      var headers = devolucaoSheet.getRange(1, 1, 1, devolucaoSheet.getLastColumn()).getValues()[0];
+      
+      // Se não tiver o campo Telefone, adicionar
+      if (headers[3] !== 'Telefone') {
+        // Criar backup
+        var backupSheet = ss.insertSheet('DevolucaoPedidos_Backup_v1_3_0');
+        devolucaoSheet.getDataRange().copyTo(backupSheet.getRange(1, 1));
+        
+        // Inserir a nova coluna (Telefone) após a coluna Cliente
+        devolucaoSheet.insertColumnAfter(3);
+        devolucaoSheet.getRange(1, 4).setValue('Telefone');
+        
+        // Migrar dados existentes
+        if (devolucaoSheet.getLastRow() > 1) {
+          for (var i = 2; i <= devolucaoSheet.getLastRow(); i++) {
+            devolucaoSheet.getRange(i, 4).setValue(''); // Telefone vazio para registros existentes
+          }
+        }
+        
+        Logger.log("Devolução de Pedidos atualizado para v1.4.0");
+      }
+    }
+    
+    return "Migração para v1.4.0 concluída com sucesso!";
+  } catch (e) {
+    Logger.log("ERRO em migrarParaV1_4_0: " + e.toString());
+    Logger.log("Stack: " + e.stack);
+    return "ERRO: " + e.toString();
+  }
+}
+
 // Função para migrar a estrutura das planilhas para a versão 1.5.0
 function migrarParaV1_5_0() {
   try {
@@ -1052,15 +1119,7 @@ function migrarParaV1_5_0() {
       var headers = devolucaoSheet.getRange(1, 1, 1, devolucaoSheet.getLastColumn()).getValues()[0];
       
       // Se não tiver o campo Motivo, adicionar
-      var temMotivo = false;
-      for (var i = 0; i < headers.length; i++) {
-        if (headers[i] === 'Motivo') {
-          temMotivo = true;
-          break;
-        }
-      }
-      
-      if (!temMotivo) {
+      if (headers[7] !== 'Motivo') {
         // Criar backup
         var backupSheet = ss.insertSheet('DevolucaoPedidos_Backup_v1_4_0');
         devolucaoSheet.getDataRange().copyTo(backupSheet.getRange(1, 1));
